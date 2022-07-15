@@ -1,74 +1,61 @@
-package net.nemanjakovacevic.recyclerviewswipetodelete;
+package net.nemanjakovacevic.recyclerviewswipetodelete
 
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
-import android.os.Bundle;
-import android.os.Handler;
-import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-import androidx.appcompat.widget.Toolbar;
-import androidx.recyclerview.widget.ItemTouchHelper;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.TextView;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.PorterDuff
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.os.Bundle
+import android.os.Handler
+import android.view.*
+import android.widget.Button
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.RecyclerView.ItemDecoration
 
 /**
  * Sample activity demonstrating swipe to remove on recycler view functionality.
  * The interesting parts are drawing while items are animating to their new positions after some items is removed
  * and a possibility to undo the removal.
  */
-public class MainActivity extends AppCompatActivity {
-
-    RecyclerView mRecyclerView;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-        setUpRecyclerView();
-
+class MainActivity : AppCompatActivity() {
+    var mRecyclerView: RecyclerView? = null
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        val toolbar = findViewById<View>(R.id.toolbar) as Toolbar
+        setSupportActionBar(toolbar)
+        mRecyclerView = findViewById<View>(R.id.recycler_view) as RecyclerView
+        setUpRecyclerView()
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main, menu)
+        return true
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.menu_item_undo_checkbox) {
-            item.setChecked(!item.isChecked());
-            ((TestAdapter)mRecyclerView.getAdapter()).setUndoOn(item.isChecked());
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.menu_item_undo_checkbox) {
+            item.isChecked = !item.isChecked
+            (mRecyclerView!!.adapter as TestAdapter?)!!.isUndoOn = item.isChecked
         }
-        if (item.getItemId() == R.id.menu_item_add_5_items) {
-            ((TestAdapter)mRecyclerView.getAdapter()).addItems(5);
+        if (item.itemId == R.id.menu_item_add_5_items) {
+            (mRecyclerView!!.adapter as TestAdapter?)!!.addItems(5)
         }
-        return super.onOptionsItemSelected(item);
+        return super.onOptionsItemSelected(item)
     }
 
-    private void setUpRecyclerView() {
-        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        mRecyclerView.setAdapter(new TestAdapter());
-        mRecyclerView.setHasFixedSize(true);
-        setUpItemTouchHelper();
-        setUpAnimationDecoratorHelper();
+    private fun setUpRecyclerView() {
+        mRecyclerView!!.layoutManager = LinearLayoutManager(this)
+        mRecyclerView!!.adapter = TestAdapter()
+        mRecyclerView!!.setHasFixedSize(true)
+        setUpItemTouchHelper()
+        setUpAnimationDecoratorHelper()
     }
 
     /**
@@ -76,116 +63,130 @@ public class MainActivity extends AppCompatActivity {
      * but whatever you draw will disappear once the swipe is over, and while the items are animating to their new position the recycler view
      * background will be visible. That is rarely an desired effect.
      */
-    private void setUpItemTouchHelper() {
+    private fun setUpItemTouchHelper() {
+        val simpleItemTouchCallback: ItemTouchHelper.SimpleCallback =
+            object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
+                // we want to cache these and not allocate anything repeatedly in the onChildDraw method
+                var background: Drawable? = null
+                var xMark: Drawable? = null
+                var xMarkMargin = 0
+                var initiated = false
 
-        ItemTouchHelper.SimpleCallback simpleItemTouchCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
-
-            // we want to cache these and not allocate anything repeatedly in the onChildDraw method
-            Drawable background;
-            Drawable xMark;
-            int xMarkMargin;
-            boolean initiated;
-
-            private void init() {
-                background = new ColorDrawable(Color.RED);
-                xMark = ContextCompat.getDrawable(MainActivity.this, R.drawable.ic_clear_24dp);
-                xMark.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_ATOP);
-                xMarkMargin = (int) MainActivity.this.getResources().getDimension(R.dimen.ic_clear_margin);
-                initiated = true;
-            }
-
-            // not important, we don't want drag & drop
-            @Override
-            public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
-                return false;
-            }
-
-            @Override
-            public int getSwipeDirs(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
-                int position = viewHolder.getAdapterPosition();
-                TestAdapter testAdapter = (TestAdapter)recyclerView.getAdapter();
-                if (testAdapter.isUndoOn() && testAdapter.isPendingRemoval(position)) {
-                    return 0;
-                }
-                return super.getSwipeDirs(recyclerView, viewHolder);
-            }
-
-            @Override
-            public void onSwiped(RecyclerView.ViewHolder viewHolder, int swipeDir) {
-                int swipedPosition = viewHolder.getAdapterPosition();
-                TestAdapter adapter = (TestAdapter)mRecyclerView.getAdapter();
-                boolean undoOn = adapter.isUndoOn();
-                if (undoOn) {
-                    adapter.pendingRemoval(swipedPosition);
-                } else {
-                    adapter.remove(swipedPosition);
-                }
-            }
-
-            @Override
-            public void onChildDraw(Canvas c, RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, float dX, float dY, int actionState, boolean isCurrentlyActive) {
-                View itemView = viewHolder.itemView;
-
-                // not sure why, but this method get's called for viewholder that are already swiped away
-                if (viewHolder.getAdapterPosition() == -1) {
-                    // not interested in those
-                    return;
+                private fun init() {
+                    background = ColorDrawable(Color.RED)
+                    xMark = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_clear_24dp)
+                    xMark!!.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_ATOP)
+                    xMarkMargin =
+                        this@MainActivity.resources.getDimension(R.dimen.ic_clear_margin).toInt()
+                    initiated = true
                 }
 
-                if (!initiated) {
-                    init();
+                // not important, we don't want drag & drop
+                override fun onMove(
+                    recyclerView: RecyclerView,
+                    viewHolder: RecyclerView.ViewHolder,
+                    target: RecyclerView.ViewHolder
+                ): Boolean {
+                    return false
                 }
 
-                // draw red background
-                background.setBounds(itemView.getRight() + (int) dX, itemView.getTop(), itemView.getRight(), itemView.getBottom());
-                background.draw(c);
+                override fun getSwipeDirs(
+                    recyclerView: RecyclerView,
+                    viewHolder: RecyclerView.ViewHolder
+                ): Int {
+                    val position = viewHolder.adapterPosition
+                    val testAdapter = recyclerView.adapter as TestAdapter?
+                    return if (testAdapter!!.isUndoOn && testAdapter.isPendingRemoval(position)) {
+                        0
+                    } else super.getSwipeDirs(recyclerView, viewHolder)
+                }
 
-                // draw x mark
-                int itemHeight = itemView.getBottom() - itemView.getTop();
-                int intrinsicWidth = xMark.getIntrinsicWidth();
-                int intrinsicHeight = xMark.getIntrinsicWidth();
+                override fun onSwiped(viewHolder: RecyclerView.ViewHolder, swipeDir: Int) {
+                    val swipedPosition = viewHolder.adapterPosition
+                    val adapter = mRecyclerView!!.adapter as TestAdapter?
+                    val undoOn = adapter!!.isUndoOn
+                    if (undoOn) {
+                        adapter.pendingRemoval(swipedPosition)
+                    } else {
+                        adapter.remove(swipedPosition)
+                    }
+                }
 
-                int xMarkLeft = itemView.getRight() - xMarkMargin - intrinsicWidth;
-                int xMarkRight = itemView.getRight() - xMarkMargin;
-                int xMarkTop = itemView.getTop() + (itemHeight - intrinsicHeight)/2;
-                int xMarkBottom = xMarkTop + intrinsicHeight;
-                xMark.setBounds(xMarkLeft, xMarkTop, xMarkRight, xMarkBottom);
+                override fun onChildDraw(
+                    c: Canvas,
+                    recyclerView: RecyclerView,
+                    viewHolder: RecyclerView.ViewHolder,
+                    dX: Float,
+                    dY: Float,
+                    actionState: Int,
+                    isCurrentlyActive: Boolean
+                ) {
+                    val itemView = viewHolder.itemView
 
-                xMark.draw(c);
+                    // not sure why, but this method get's called for viewholder that are already swiped away
+                    if (viewHolder.adapterPosition == -1) {
+                        // not interested in those
+                        return
+                    }
+                    if (!initiated) {
+                        init()
+                    }
 
-                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
+                    // draw red background
+                    background!!.setBounds(
+                        itemView.right + dX.toInt(),
+                        itemView.top,
+                        itemView.right,
+                        itemView.bottom
+                    )
+                    background!!.draw(c)
+
+                    // draw x mark
+                    val itemHeight = itemView.bottom - itemView.top
+                    val intrinsicWidth = xMark!!.intrinsicWidth
+                    val intrinsicHeight = xMark!!.intrinsicWidth
+                    val xMarkLeft = itemView.right - xMarkMargin - intrinsicWidth
+                    val xMarkRight = itemView.right - xMarkMargin
+                    val xMarkTop = itemView.top + (itemHeight - intrinsicHeight) / 2
+                    val xMarkBottom = xMarkTop + intrinsicHeight
+                    xMark!!.setBounds(xMarkLeft, xMarkTop, xMarkRight, xMarkBottom)
+                    xMark!!.draw(c)
+                    super.onChildDraw(
+                        c,
+                        recyclerView,
+                        viewHolder,
+                        dX,
+                        dY,
+                        actionState,
+                        isCurrentlyActive
+                    )
+                }
             }
-
-        };
-        ItemTouchHelper mItemTouchHelper = new ItemTouchHelper(simpleItemTouchCallback);
-        mItemTouchHelper.attachToRecyclerView(mRecyclerView);
+        val mItemTouchHelper = ItemTouchHelper(simpleItemTouchCallback)
+        mItemTouchHelper.attachToRecyclerView(mRecyclerView)
     }
 
     /**
      * We're gonna setup another ItemDecorator that will draw the red background in the empty space while the items are animating to thier new positions
      * after an item is removed.
      */
-    private void setUpAnimationDecoratorHelper() {
-        mRecyclerView.addItemDecoration(new RecyclerView.ItemDecoration() {
-
+    private fun setUpAnimationDecoratorHelper() {
+        mRecyclerView!!.addItemDecoration(object : ItemDecoration() {
             // we want to cache this and not allocate anything repeatedly in the onDraw method
-            Drawable background;
-            boolean initiated;
-
-            private void init() {
-                background = new ColorDrawable(Color.RED);
-                initiated = true;
+            var background: Drawable? = null
+            var initiated = false
+            private fun init() {
+                background = ColorDrawable(Color.RED)
+                initiated = true
             }
 
-            @Override
-            public void onDraw(Canvas c, RecyclerView parent, RecyclerView.State state) {
-
+            override fun onDraw(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
                 if (!initiated) {
-                    init();
+                    init()
                 }
 
                 // only if animation is in progress
-                if (parent.getItemAnimator().isRunning()) {
+                if (parent.itemAnimator!!.isRunning) {
 
                     // some items might be animating down and some items might be animating up to close the gap left by the removed item
                     // this is not exclusive, both movement can be happening at the same time
@@ -195,194 +196,169 @@ public class MainActivity extends AppCompatActivity {
                     // find first child with translationY > 0
                     // and last one with translationY < 0
                     // we're after a rect that is not covered in recycler-view views at this point in time
-                    View lastViewComingDown = null;
-                    View firstViewComingUp = null;
+                    var lastViewComingDown: View? = null
+                    var firstViewComingUp: View? = null
 
                     // this is fixed
-                    int left = 0;
-                    int right = parent.getWidth();
+                    val left = 0
+                    val right = parent.width
 
                     // this we need to find out
-                    int top = 0;
-                    int bottom = 0;
+                    var top = 0
+                    var bottom = 0
 
                     // find relevant translating views
-                    int childCount = parent.getLayoutManager().getChildCount();
-                    for (int i = 0; i < childCount; i++) {
-                        View child = parent.getLayoutManager().getChildAt(i);
-                        if (child.getTranslationY() < 0) {
+                    val childCount = parent.layoutManager!!.childCount
+                    for (i in 0 until childCount) {
+                        val child = parent.layoutManager!!.getChildAt(i)
+                        if (child!!.translationY < 0) {
                             // view is coming down
-                            lastViewComingDown = child;
-                        } else if (child.getTranslationY() > 0) {
+                            lastViewComingDown = child
+                        } else if (child.translationY > 0) {
                             // view is coming up
                             if (firstViewComingUp == null) {
-                                firstViewComingUp = child;
+                                firstViewComingUp = child
                             }
                         }
                     }
-
                     if (lastViewComingDown != null && firstViewComingUp != null) {
                         // views are coming down AND going up to fill the void
-                        top = lastViewComingDown.getBottom() + (int) lastViewComingDown.getTranslationY();
-                        bottom = firstViewComingUp.getTop() + (int) firstViewComingUp.getTranslationY();
+                        top = lastViewComingDown.bottom + lastViewComingDown.translationY.toInt()
+                        bottom = firstViewComingUp.top + firstViewComingUp.translationY.toInt()
                     } else if (lastViewComingDown != null) {
                         // views are going down to fill the void
-                        top = lastViewComingDown.getBottom() + (int) lastViewComingDown.getTranslationY();
-                        bottom = lastViewComingDown.getBottom();
+                        top = lastViewComingDown.bottom + lastViewComingDown.translationY.toInt()
+                        bottom = lastViewComingDown.bottom
                     } else if (firstViewComingUp != null) {
                         // views are coming up to fill the void
-                        top = firstViewComingUp.getTop();
-                        bottom = firstViewComingUp.getTop() + (int) firstViewComingUp.getTranslationY();
+                        top = firstViewComingUp.top
+                        bottom = firstViewComingUp.top + firstViewComingUp.translationY.toInt()
                     }
-
-                    background.setBounds(left, top, right, bottom);
-                    background.draw(c);
-
+                    background!!.setBounds(left, top, right, bottom)
+                    background!!.draw(c)
                 }
-                super.onDraw(c, parent, state);
+                super.onDraw(c, parent, state)
             }
-
-        });
+        })
     }
 
     /**
      * RecyclerView adapter enabling undo on a swiped away item.
      */
-    class TestAdapter extends RecyclerView.Adapter {
+    internal inner class TestAdapter : RecyclerView.Adapter<TestViewHolder>() {
+        var items: MutableList<String> = ArrayList()
+        var itemsPendingRemoval: MutableList<String> = ArrayList()
+        private var lastInsertedIndex: Int =
+            15 // so we can add some more items for testing purposes
 
-        private static final int PENDING_REMOVAL_TIMEOUT = 3000; // 3sec
+        var isUndoOn = false // is undo on, you can turn it on from the toolbar menu
 
-        List<String> items;
-        List<String> itemsPendingRemoval;
-        int lastInsertedIndex; // so we can add some more items for testing purposes
-        boolean undoOn; // is undo on, you can turn it on from the toolbar menu
+        private val handler = Handler() // handler for running delayed runnables
+        private var pendingRunnables =
+            HashMap<String, Runnable>() // map of items to pending runnables, so we can cancel a removal if need be
 
-        private Handler handler = new Handler(); // hanlder for running delayed runnables
-        HashMap<String, Runnable> pendingRunnables = new HashMap<>(); // map of items to pending runnables, so we can cancel a removal if need be
-
-        public TestAdapter() {
-            items = new ArrayList<>();
-            itemsPendingRemoval = new ArrayList<>();
-            // let's generate some items
-            lastInsertedIndex = 15;
-            // this should give us a couple of screens worth
-            for (int i=1; i<= lastInsertedIndex; i++) {
-                items.add("Item " + i);
-            }
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TestViewHolder {
+            return TestViewHolder(parent)
         }
 
-        @Override
-        public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            return new TestViewHolder(parent);
-        }
-
-        @Override
-        public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
-            TestViewHolder viewHolder = (TestViewHolder)holder;
-            final String item = items.get(position);
-
+        override fun onBindViewHolder(holder: TestViewHolder, position: Int) {
+            val viewHolder = holder as TestViewHolder?
+            val item = items[position]
             if (itemsPendingRemoval.contains(item)) {
                 // we need to show the "undo" state of the row
-                viewHolder.itemView.setBackgroundColor(Color.RED);
-                viewHolder.titleTextView.setVisibility(View.GONE);
-                viewHolder.undoButton.setVisibility(View.VISIBLE);
-                viewHolder.undoButton.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        // user wants to undo the removal, let's cancel the pending task
-                        Runnable pendingRemovalRunnable = pendingRunnables.get(item);
-                        pendingRunnables.remove(item);
-                        if (pendingRemovalRunnable != null) handler.removeCallbacks(pendingRemovalRunnable);
-                        itemsPendingRemoval.remove(item);
-                        // this will rebind the row in "normal" state
-                        notifyItemChanged(items.indexOf(item));
-                    }
-                });
+                viewHolder!!.itemView.setBackgroundColor(Color.RED)
+                viewHolder.titleTextView.visibility = View.GONE
+                viewHolder.undoButton.visibility = View.VISIBLE
+                viewHolder.undoButton.setOnClickListener { // user wants to undo the removal, let's cancel the pending task
+                    val pendingRemovalRunnable = pendingRunnables[item]
+                    pendingRunnables.remove(item)
+                    if (pendingRemovalRunnable != null) handler.removeCallbacks(
+                        pendingRemovalRunnable
+                    )
+                    itemsPendingRemoval.remove(item)
+                    // this will rebind the row in "normal" state
+                    notifyItemChanged(items.indexOf(item))
+                }
             } else {
                 // we need to show the "normal" state
-                viewHolder.itemView.setBackgroundColor(Color.WHITE);
-                viewHolder.titleTextView.setVisibility(View.VISIBLE);
-                viewHolder.titleTextView.setText(item);
-                viewHolder.undoButton.setVisibility(View.GONE);
-                viewHolder.undoButton.setOnClickListener(null);
+                viewHolder!!.itemView.setBackgroundColor(Color.WHITE)
+                viewHolder.titleTextView.visibility = View.VISIBLE
+                viewHolder.titleTextView.text = item
+                viewHolder.undoButton.visibility = View.GONE
+                viewHolder.undoButton.setOnClickListener(null)
             }
         }
 
-        @Override
-        public int getItemCount() {
-            return items.size();
+        override fun getItemCount(): Int {
+            return items.size
         }
 
         /**
-         *  Utility method to add some rows for testing purposes. You can add rows from the toolbar menu.
+         * Utility method to add some rows for testing purposes. You can add rows from the toolbar menu.
          */
-        public void addItems(int howMany){
+        fun addItems(howMany: Int) {
             if (howMany > 0) {
-                for (int i = lastInsertedIndex + 1; i <= lastInsertedIndex + howMany; i++) {
-                    items.add("Item " + i);
-                    notifyItemInserted(items.size() - 1);
+                for (i in lastInsertedIndex + 1..lastInsertedIndex + howMany) {
+                    items.add("Item $i")
+                    notifyItemInserted(items.size - 1)
                 }
-                lastInsertedIndex = lastInsertedIndex + howMany;
+                lastInsertedIndex += howMany
             }
         }
 
-        public void setUndoOn(boolean undoOn) {
-            this.undoOn = undoOn;
-        }
-
-        public boolean isUndoOn() {
-            return undoOn;
-        }
-
-        public void pendingRemoval(int position) {
-            final String item = items.get(position);
+        fun pendingRemoval(position: Int) {
+            val item = items[position]
             if (!itemsPendingRemoval.contains(item)) {
-                itemsPendingRemoval.add(item);
+                itemsPendingRemoval.add(item)
                 // this will redraw row in "undo" state
-                notifyItemChanged(position);
+                notifyItemChanged(position)
                 // let's create, store and post a runnable to remove the item
-                Runnable pendingRemovalRunnable = new Runnable() {
-                    @Override
-                    public void run() {
-                        remove(items.indexOf(item));
-                    }
-                };
-                handler.postDelayed(pendingRemovalRunnable, PENDING_REMOVAL_TIMEOUT);
-                pendingRunnables.put(item, pendingRemovalRunnable);
+                val pendingRemovalRunnable = Runnable { remove(items.indexOf(item)) }
+                handler.postDelayed(
+                    pendingRemovalRunnable,
+                    PENDING_REMOVAL_TIMEOUT.toLong()
+                )
+                pendingRunnables[item] = pendingRemovalRunnable
             }
         }
 
-        public void remove(int position) {
-            String item = items.get(position);
+        fun remove(position: Int) {
+            val item = items[position]
             if (itemsPendingRemoval.contains(item)) {
-                itemsPendingRemoval.remove(item);
+                itemsPendingRemoval.remove(item)
             }
             if (items.contains(item)) {
-                items.remove(position);
-                notifyItemRemoved(position);
+                items.removeAt(position)
+                notifyItemRemoved(position)
             }
         }
 
-        public boolean isPendingRemoval(int position) {
-            String item = items.get(position);
-            return itemsPendingRemoval.contains(item);
+        fun isPendingRemoval(position: Int): Boolean {
+            val item = items[position]
+            return itemsPendingRemoval.contains(item)
+        }
+
+        init {
+            // let's generate some items
+            // this should give us a couple of screens worth
+            for (i in 1..lastInsertedIndex) {
+                items.add("Item $i")
+            }
         }
     }
 
     /**
      * ViewHolder capable of presenting two states: "normal" and "undo" state.
      */
-    static class TestViewHolder extends RecyclerView.ViewHolder {
-
-        TextView titleTextView;
-        Button undoButton;
-
-        public TestViewHolder(ViewGroup parent) {
-            super(LayoutInflater.from(parent.getContext()).inflate(R.layout.row_view, parent, false));
-            titleTextView = (TextView) itemView.findViewById(R.id.title_text_view);
-            undoButton = (Button) itemView.findViewById(R.id.undo_button);
-        }
+    internal class TestViewHolder(parent: ViewGroup) : RecyclerView.ViewHolder(
+        LayoutInflater.from(parent.context).inflate(R.layout.row_view, parent, false)
+    ) {
+        var titleTextView: TextView = itemView.findViewById<View>(R.id.title_text_view) as TextView
+        var undoButton: Button = itemView.findViewById<View>(R.id.undo_button) as Button
 
     }
 
+    companion object {
+        private const val PENDING_REMOVAL_TIMEOUT = 3000 // 3sec
+    }
 }
