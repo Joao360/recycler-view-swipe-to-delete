@@ -24,7 +24,8 @@ import androidx.recyclerview.widget.RecyclerView.ItemDecoration
  * and a possibility to undo the removal.
  */
 class MainActivity : AppCompatActivity() {
-    var mRecyclerView: RecyclerView? = null
+    lateinit var mRecyclerView: RecyclerView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -42,18 +43,18 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == R.id.menu_item_undo_checkbox) {
             item.isChecked = !item.isChecked
-            (mRecyclerView!!.adapter as TestAdapter?)!!.isUndoOn = item.isChecked
+            (mRecyclerView.adapter as TestAdapter?)!!.isUndoOn = item.isChecked
         }
         if (item.itemId == R.id.menu_item_add_5_items) {
-            (mRecyclerView!!.adapter as TestAdapter?)!!.addItems(5)
+            (mRecyclerView.adapter as TestAdapter?)!!.addItems(5)
         }
         return super.onOptionsItemSelected(item)
     }
 
     private fun setUpRecyclerView() {
-        mRecyclerView!!.layoutManager = LinearLayoutManager(this)
-        mRecyclerView!!.adapter = TestAdapter()
-        mRecyclerView!!.setHasFixedSize(true)
+        mRecyclerView.layoutManager = LinearLayoutManager(this)
+        mRecyclerView.adapter = TestAdapter()
+        mRecyclerView.setHasFixedSize(true)
         setUpItemTouchHelper()
         setUpAnimationDecoratorHelper()
     }
@@ -67,17 +68,13 @@ class MainActivity : AppCompatActivity() {
         val simpleItemTouchCallback: ItemTouchHelper.SimpleCallback =
             object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
                 // we want to cache these and not allocate anything repeatedly in the onChildDraw method
-                var background: Drawable? = null
-                var xMark: Drawable? = null
-                var xMarkMargin = 0
+                var background: Drawable = ColorDrawable(Color.RED)
+                var xMark: Drawable? = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_clear_24dp)
+                var xMarkMargin = this@MainActivity.resources.getDimension(R.dimen.ic_clear_margin).toInt()
                 var initiated = false
 
                 private fun init() {
-                    background = ColorDrawable(Color.RED)
-                    xMark = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_clear_24dp)
                     xMark!!.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_ATOP)
-                    xMarkMargin =
-                        this@MainActivity.resources.getDimension(R.dimen.ic_clear_margin).toInt()
                     initiated = true
                 }
 
@@ -103,7 +100,7 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onSwiped(viewHolder: RecyclerView.ViewHolder, swipeDir: Int) {
                     val swipedPosition = viewHolder.adapterPosition
-                    val adapter = mRecyclerView!!.adapter as TestAdapter?
+                    val adapter = mRecyclerView.adapter as TestAdapter?
                     val undoOn = adapter!!.isUndoOn
                     if (undoOn) {
                         adapter.pendingRemoval(swipedPosition)
@@ -133,13 +130,13 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     // draw red background
-                    background!!.setBounds(
+                    background.setBounds(
                         itemView.right + dX.toInt(),
                         itemView.top,
                         itemView.right,
                         itemView.bottom
                     )
-                    background!!.draw(c)
+                    background.draw(c)
 
                     // draw x mark
                     val itemHeight = itemView.bottom - itemView.top
@@ -167,11 +164,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * We're gonna setup another ItemDecorator that will draw the red background in the empty space while the items are animating to thier new positions
+     * We're gonna setup another ItemDecorator that will draw the red background in the empty space while the items are animating to their new positions
      * after an item is removed.
      */
     private fun setUpAnimationDecoratorHelper() {
-        mRecyclerView!!.addItemDecoration(object : ItemDecoration() {
+        mRecyclerView.addItemDecoration(object : ItemDecoration() {
             // we want to cache this and not allocate anything repeatedly in the onDraw method
             var background: Drawable? = null
             var initiated = false
@@ -248,14 +245,12 @@ class MainActivity : AppCompatActivity() {
     internal inner class TestAdapter : RecyclerView.Adapter<TestViewHolder>() {
         var items: MutableList<String> = ArrayList()
         var itemsPendingRemoval: MutableList<String> = ArrayList()
-        private var lastInsertedIndex: Int =
-            15 // so we can add some more items for testing purposes
+        private var lastInsertedIndex = 15 // so we can add some more items for testing purposes
 
         var isUndoOn = false // is undo on, you can turn it on from the toolbar menu
 
         private val handler = Handler() // handler for running delayed runnables
-        private var pendingRunnables =
-            HashMap<String, Runnable>() // map of items to pending runnables, so we can cancel a removal if need be
+        private var pendingRunnables = HashMap<String, Runnable>() // map of items to pending runnables, so we can cancel a removal if need be
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TestViewHolder {
             return TestViewHolder(parent)
